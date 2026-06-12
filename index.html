@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>하루 — 습관 &amp; 무드 트래커</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#10131f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #10131f;
+    --accent: #a8d8c8;
+    --accent2: #c4a8e8;
+    --gold: #e8d5a8;
+    --text: #eef1f6;
+    --muted: #8b94a8;
+    --glass: rgba(255,255,255,0.055);
+    --glass-border: rgba(255,255,255,0.1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    font-family: 'Gowun Dodum', -apple-system, 'Malgun Gothic', sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100vh;
+    display: flex; flex-direction: column; align-items: center;
+    padding: 48px 18px 70px;
+    overflow-x: hidden;
+  }
+  .aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; }
+  .aurora span { position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.35; }
+  .aurora span:nth-child(1) { width: 60vmax; height: 60vmax; left: -15vmax; top: -20vmax; background: #2a4a5e; animation: drift1 26s ease-in-out infinite alternate; }
+  .aurora span:nth-child(2) { width: 50vmax; height: 50vmax; right: -18vmax; top: 15vh; background: #3d2e5c; animation: drift2 32s ease-in-out infinite alternate; }
+  .aurora span:nth-child(3) { width: 45vmax; height: 45vmax; left: 10vw; bottom: -25vmax; background: #1e4a40; animation: drift3 28s ease-in-out infinite alternate; }
+  @keyframes drift1 { to { transform: translate(12vw, 10vh) scale(1.15); } }
+  @keyframes drift2 { to { transform: translate(-10vw, 14vh) scale(0.9); } }
+  @keyframes drift3 { to { transform: translate(8vw, -12vh) scale(1.2); } }
+
+  h1 {
+    font-family: 'Gowun Batang', serif; font-weight: 400;
+    letter-spacing: 16px; text-indent: 16px; font-size: 34px; margin-bottom: 8px;
+    background: linear-gradient(120deg, var(--accent), var(--accent2), var(--gold));
+    -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  .sub { color: var(--muted); margin-bottom: 8px; font-size: 13px; letter-spacing: 2px; }
+  .today-date { font-family: 'Gowun Batang', serif; font-size: 15px; color: var(--gold); margin-bottom: 30px; letter-spacing: 1px; }
+
+  .card {
+    width: 100%; max-width: 440px;
+    background: var(--glass); border: 1px solid var(--glass-border);
+    border-radius: 22px; padding: 22px 20px; margin-bottom: 18px;
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  }
+  .card-title { font-size: 12px; color: var(--muted); letter-spacing: 4px; margin-bottom: 16px; }
+
+  /* --- 무드 --- */
+  .moods { display: flex; justify-content: space-between; gap: 8px; }
+  .mood {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 7px;
+    padding: 12px 4px; border-radius: 16px; cursor: pointer;
+    border: 1px solid transparent; transition: all 0.25s;
+    background: transparent; color: var(--text); font-family: inherit;
+  }
+  .mood .dot { width: 30px; height: 30px; border-radius: 50%; transition: transform 0.25s; }
+  .mood .name { font-size: 11px; color: var(--muted); }
+  .mood:hover .dot { transform: scale(1.15); }
+  .mood.active { background: rgba(255,255,255,0.08); border-color: var(--glass-border); }
+  .mood.active .dot { transform: scale(1.25); box-shadow: 0 0 18px currentColor; }
+  .mood.active .name { color: var(--text); }
+
+  /* --- 습관 --- */
+  .habit {
+    display: flex; align-items: center; gap: 14px;
+    padding: 13px 10px; border-radius: 14px; cursor: pointer;
+    transition: background 0.2s; user-select: none;
+  }
+  .habit:hover { background: rgba(255,255,255,0.05); }
+  .habit .check {
+    width: 26px; height: 26px; border-radius: 9px; flex-shrink: 0;
+    border: 1.5px solid var(--glass-border);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 15px; color: #10131f;
+    transition: all 0.25s;
+  }
+  .habit.done .check {
+    background: linear-gradient(135deg, var(--accent), #7fb8a4);
+    border-color: transparent; box-shadow: 0 2px 14px rgba(168,216,200,0.4);
+  }
+  .habit .check span { opacity: 0; transform: scale(0.4); transition: all 0.2s; }
+  .habit.done .check span { opacity: 1; transform: scale(1); }
+  .habit .label { flex: 1; font-size: 15.5px; }
+  .habit.done .label { color: var(--muted); text-decoration: line-through; text-decoration-color: rgba(168,216,200,0.5); }
+  .habit .streak { font-size: 12px; color: var(--gold); }
+  .habit .del {
+    display: none; border: none; background: none; color: #d88a8a;
+    font-size: 17px; cursor: pointer; padding: 4px 8px;
+  }
+  body.editing .habit .del { display: block; }
+  body.editing .habit .streak { display: none; }
+
+  .habit-actions { display: flex; gap: 10px; margin-top: 14px; }
+  .mini-btn {
+    flex: 1; padding: 11px; border-radius: 14px; cursor: pointer;
+    background: rgba(255,255,255,0.06); color: var(--muted);
+    border: 1px dashed var(--glass-border); font-family: inherit; font-size: 13.5px;
+    transition: all 0.2s;
+  }
+  .mini-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+  .add-row { display: none; gap: 8px; margin-top: 12px; }
+  .add-row.open { display: flex; }
+  .add-row input {
+    flex: 1; padding: 12px 16px; border-radius: 14px;
+    border: 1px solid var(--glass-border); background: rgba(0,0,0,0.25);
+    color: var(--text); font-family: inherit; font-size: 15px; outline: none;
+  }
+  .add-row input:focus { border-color: var(--accent); }
+  .add-row button {
+    padding: 12px 20px; border-radius: 14px; border: none; cursor: pointer;
+    background: linear-gradient(135deg, var(--accent), #86bda9);
+    color: #10131f; font-weight: 700; font-family: inherit; font-size: 14px;
+  }
+
+  .progress-line { height: 7px; border-radius: 4px; background: rgba(255,255,255,0.07); margin-top: 18px; overflow: hidden; }
+  .progress-line i {
+    display: block; height: 100%; border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2), var(--gold));
+    transition: width 0.5s cubic-bezier(.4,0,.2,1);
+  }
+  .progress-text { font-size: 12px; color: var(--muted); margin-top: 8px; text-align: right; }
+
+  /* --- 달력 --- */
+  .cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .cal-head .month { font-family: 'Gowun Batang', serif; font-size: 17px; }
+  .cal-head button {
+    border: none; background: rgba(255,255,255,0.06); color: var(--muted);
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 15px;
+  }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+  .cal-grid .dow { text-align: center; font-size: 10.5px; color: var(--muted); padding: 4px 0; }
+  .cal-cell {
+    aspect-ratio: 1; border-radius: 11px; position: relative;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    background: rgba(255,255,255,0.035); font-size: 12px; color: var(--muted);
+    border: 1px solid transparent;
+  }
+  .cal-cell.empty { background: transparent; }
+  .cal-cell.today { border-color: var(--gold); }
+  .cal-cell .ratio { font-size: 8.5px; margin-top: 2px; opacity: 0.9; }
+  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; justify-content: center; }
+  .legend span { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
+  .legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
+
+  .quote {
+    margin-top: 26px; color: var(--muted); font-size: 13px;
+    font-family: 'Gowun Batang', serif; text-align: center;
+    max-width: 320px; line-height: 1.9; opacity: 0.8;
+  }
+</style>
+</head>
+<body>
+<div class="aurora"><span></span><span></span><span></span></div>
+
+<h1>하루</h1>
+<div class="sub">오늘 하루는 어땠나요?</div>
+<div class="today-date" id="todayDate"></div>
+
+<div class="card">
+  <div class="card-title">오늘의 기분</div>
+  <div class="moods" id="moods"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">오늘의 습관</div>
+  <div id="habitList"></div>
+  <div class="add-row" id="addRow">
+    <input type="text" id="newHabit" placeholder="새 습관 이름" maxlength="20">
+    <button id="addConfirm">추가</button>
+  </div>
+  <div class="habit-actions">
+    <button class="mini-btn" id="addBtn">＋ 습관 추가</button>
+    <button class="mini-btn" id="editBtn">✎ 편집</button>
+  </div>
+  <div class="progress-line"><i id="progressBar" style="width:0%"></i></div>
+  <div class="progress-text" id="progressText"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">이번 달</div>
+  <div class="cal-head">
+    <button id="prevM">‹</button>
+    <div class="month" id="calMonth"></div>
+    <button id="nextM">›</button>
+  </div>
+  <div class="cal-grid" id="calGrid"></div>
+  <div class="legend" id="legend"></div>
+</div>
+
+<div class="quote" id="quote"></div>
+
+<script>
+const MOODS = [
+  { name: '최고', emoji: '🌞', color: '#e8d5a8' },
+  { name: '좋음', emoji: '🌿', color: '#a8d8c8' },
+  { name: '보통', emoji: '🌙', color: '#8fb0d8' },
+  { name: '별로', emoji: '🌧', color: '#c4a8e8' },
+  { name: '힘듦', emoji: '🌫', color: '#6b7287' }
+];
+const DEFAULT_HABITS = ['🧘 명상', '💪 근력운동', '🏃 유산소운동', '🍰 단거 안먹기', '🍺 술 안먹기', '📝 감사일기'];
+const DOW = ['일', '월', '화', '수', '목', '금', '토'];
+
+const $ = id => document.getElementById(id);
+const todayKey = () => {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+};
+
+// --- 데이터 ---
+function load() {
+  try {
+    const d = JSON.parse(localStorage.getItem('haru-data'));
+    if (d && d.habits && d.days) return d;
+  } catch (e) {}
+  return { habits: DEFAULT_HABITS.slice(), days: {} };
+}
+function save() { localStorage.setItem('haru-data', JSON.stringify(data)); }
+let data = load();
+let viewYear = new Date().getFullYear(), viewMonth = new Date().getMonth();
+
+function dayRec(key) {
+  if (!data.days[key]) data.days[key] = { mood: null, done: [] };
+  return data.days[key];
+}
+
+// --- 오늘 날짜 ---
+const now = new Date();
+$('todayDate').textContent = now.getFullYear() + '년 ' + (now.getMonth() + 1) + '월 ' + now.getDate() + '일 ' + DOW[now.getDay()] + '요일';
+
+// --- 무드 ---
+function renderMoods() {
+  const rec = dayRec(todayKey());
+  $('moods').innerHTML = MOODS.map((m, i) =>
+    '<button class="mood' + (rec.mood === i ? ' active' : '') + '" data-i="' + i + '" style="color:' + m.color + '">' +
+    '<span class="dot" style="background:' + m.color + '"></span>' +
+    '<span class="name">' + m.emoji + ' ' + m.name + '</span></button>'
+  ).join('');
+  document.querySelectorAll('.mood').forEach(b => b.onclick = () => {
+    const rec = dayRec(todayKey());
+    rec.mood = rec.mood === +b.dataset.i ? null : +b.dataset.i;
+    save(); renderMoods(); renderCal();
+  });
+}
+
+// --- 습관 스트릭 ---
+function habitStreak(name) {
+  let streak = 0;
+  const d = new Date();
+  const k = dt => dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+  // 오늘 아직 안 했으면 어제부터 센다
+  if (!(data.days[k(d)] && data.days[k(d)].done.includes(name))) d.setDate(d.getDate() - 1);
+  while (data.days[k(d)] && data.days[k(d)].done.includes(name)) {
+    streak++;
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+// --- 습관 목록 ---
+function renderHabits() {
+  const rec = dayRec(todayKey());
+  $('habitList').innerHTML = data.habits.map((h, i) => {
+    const done = rec.done.includes(h);
+    const st = habitStreak(h);
+    return '<div class="habit' + (done ? ' done' : '') + '" data-i="' + i + '">' +
+      '<div class="check"><span>✓</span></div>' +
+      '<div class="label">' + h + '</div>' +
+      (st > 0 ? '<div class="streak">' + st + '일째 🔥</div>' : '') +
+      '<button class="del" data-del="' + i + '">✕</button></div>';
+  }).join('');
+
+  document.querySelectorAll('.habit').forEach(el => el.onclick = e => {
+    if (e.target.closest('.del')) return;
+    const h = data.habits[+el.dataset.i];
+    const rec = dayRec(todayKey());
+    const idx = rec.done.indexOf(h);
+    if (idx >= 0) rec.done.splice(idx, 1); else rec.done.push(h);
+    save(); renderHabits(); renderCal();
+  });
+  document.querySelectorAll('.del').forEach(b => b.onclick = () => {
+    const h = data.habits[+b.dataset.del];
+    if (!confirm('"' + h + '" 습관을 삭제할까요?\n(지난 기록은 그대로 남아요)')) return;
+    data.habits.splice(+b.dataset.del, 1);
+    save(); renderHabits(); renderCal();
+  });
+
+  const doneCount = rec.done.filter(h => data.habits.includes(h)).length;
+  const pct = data.habits.length ? Math.round(doneCount / data.habits.length * 100) : 0;
+  $('progressBar').style.width = pct + '%';
+  $('progressText').textContent = doneCount + ' / ' + data.habits.length + ' 완료 (' + pct + '%)' + (pct === 100 ? ' 🎉 완벽한 하루!' : '');
+}
+
+// --- 달력 ---
+function renderCal() {
+  $('calMonth').textContent = viewYear + '년 ' + (viewMonth + 1) + '월';
+  const first = new Date(viewYear, viewMonth, 1).getDay();
+  const days = new Date(viewYear, viewMonth + 1, 0).getDate();
+  let html = DOW.map(d => '<div class="dow">' + d + '</div>').join('');
+  for (let i = 0; i < first; i++) html += '<div class="cal-cell empty"></div>';
+  const tk = todayKey();
+  for (let d = 1; d <= days; d++) {
+    const key = viewYear + '-' + String(viewMonth + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    const rec = data.days[key];
+    let style = '', ratio = '';
+    if (rec && rec.mood !== null && rec.mood !== undefined) {
+      style = 'background:' + MOODS[rec.mood].color + '33;border-color:' + MOODS[rec.mood].color + '55;color:#dfe5ee;';
+    }
+    if (rec && rec.done.length) {
+      const n = rec.done.filter(h => data.habits.includes(h)).length;
+      if (n) ratio = '<span class="ratio">' + (n >= data.habits.length && data.habits.length ? '★' : '●'.repeat(Math.min(n, 4))) + '</span>';
+    }
+    html += '<div class="cal-cell' + (key === tk ? ' today' : '') + '" style="' + style + '">' + d + ratio + '</div>';
+  }
+  $('calGrid').innerHTML = html;
+  $('legend').innerHTML = MOODS.map(m => '<span><i style="background:' + m.color + '"></i>' + m.name + '</span>').join('') +
+    '<span>● 습관 개수</span><span>★ 전부 달성</span>';
+}
+$('prevM').onclick = () => { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } renderCal(); };
+$('nextM').onclick = () => { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } renderCal(); };
+
+// --- 습관 추가/편집 ---
+$('addBtn').onclick = () => { $('addRow').classList.toggle('open'); $('newHabit').focus(); };
+$('addConfirm').onclick = addHabit;
+$('newHabit').onkeydown = e => { if (e.key === 'Enter') addHabit(); };
+function addHabit() {
+  const name = $('newHabit').value.trim();
+  if (!name) return;
+  if (data.habits.includes(name)) { alert('이미 있는 습관이에요!'); return; }
+  data.habits.push(name);
+  $('newHabit').value = '';
+  $('addRow').classList.remove('open');
+  save(); renderHabits();
+}
+$('editBtn').onclick = () => {
+  document.body.classList.toggle('editing');
+  $('editBtn').textContent = document.body.classList.contains('editing') ? '완료' : '✎ 편집';
+};
+
+// --- 오늘의 한 줄 ---
+const quotes = [
+  '“작은 반복이 큰 변화를 만든다.”',
+  '“완벽한 하루보다, 꾸준한 하루.”',
+  '“오늘 하나라도 했다면, 그걸로 충분하다.”',
+  '“기록하는 사람은 자신을 잊지 않는다.”',
+  '“어제의 나보다 한 걸음만.”'
+];
+$('quote').textContent = quotes[new Date().getDate() % quotes.length];
+
+renderMoods();
+renderHabits();
+renderCal();
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  navigator.serviceWorker.register('sw.js');
+}
+</script>
+</body>
+</html>
