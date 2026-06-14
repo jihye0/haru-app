@@ -143,12 +143,13 @@
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
   .cal-grid .dow { text-align: center; font-size: 10.5px; color: var(--muted); padding: 4px 0; }
   .cal-cell {
-    aspect-ratio: 1; border-radius: 11px; position: relative;
+    aspect-ratio: 1; border-radius: 11px; position: relative; cursor: pointer;
     display: flex; flex-direction: column; align-items: center; justify-content: center;
     background: rgba(255,255,255,0.035); font-size: 12px; color: var(--muted);
-    border: 1px solid transparent;
+    border: 1px solid transparent; transition: transform 0.15s;
   }
-  .cal-cell.empty { background: transparent; }
+  .cal-cell:not(.empty):hover { transform: scale(1.08); }
+  .cal-cell.empty { background: transparent; cursor: default; }
   .cal-cell.today { border-color: var(--gold); }
   .cal-cell .ratio { font-size: 8.5px; margin-top: 2px; opacity: 0.9; }
   .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 14px; justify-content: center; }
@@ -159,6 +160,47 @@
     margin-top: 26px; color: var(--muted); font-size: 13px;
     font-family: 'Gowun Batang', serif; text-align: center;
     max-width: 320px; line-height: 1.9; opacity: 0.8;
+  }
+
+  /* --- 날짜 상세 팝업 --- */
+  .overlay {
+    position: fixed; inset: 0; z-index: 50;
+    background: rgba(5,7,14,0.6); backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px);
+    display: none; align-items: flex-end; justify-content: center;
+  }
+  .overlay.open { display: flex; animation: fadein 0.25s; }
+  @keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+  .sheet {
+    width: 100%; max-width: 460px;
+    background: #161b2b; border: 1px solid var(--glass-border);
+    border-radius: 26px 26px 0 0; padding: 26px 24px 38px;
+    animation: slideup 0.3s cubic-bezier(.4,0,.2,1);
+    max-height: 80vh; overflow-y: auto;
+  }
+  @media (min-width: 480px) {
+    .overlay { align-items: center; }
+    .sheet { border-radius: 26px; }
+  }
+  @keyframes slideup { from { transform: translateY(100%); } to { transform: translateY(0); } }
+  .sheet-handle { width: 42px; height: 5px; border-radius: 3px; background: rgba(255,255,255,0.18); margin: 0 auto 20px; }
+  .sheet-date { font-family: 'Gowun Batang', serif; font-size: 19px; margin-bottom: 4px; }
+  .sheet-mood { font-size: 14px; color: var(--muted); margin-bottom: 20px; }
+  .sheet-section { font-size: 11.5px; color: var(--muted); letter-spacing: 3px; margin: 18px 0 10px; }
+  .sheet-habit {
+    display: flex; align-items: center; gap: 11px; padding: 9px 4px; font-size: 14.5px;
+  }
+  .sheet-habit .mk {
+    width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 13px;
+  }
+  .sheet-habit.yes .mk { background: linear-gradient(135deg, var(--accent), #7fb8a4); color: #10131f; }
+  .sheet-habit.no .mk { border: 1.5px solid var(--glass-border); color: var(--muted); }
+  .sheet-habit.no { color: var(--muted); }
+  .sheet-empty { color: var(--muted); font-size: 13.5px; text-align: center; padding: 20px 0; line-height: 1.8; }
+  .sheet-close {
+    width: 100%; margin-top: 24px; padding: 14px; border-radius: 16px; border: none; cursor: pointer;
+    background: var(--glass); color: var(--text); border: 1px solid var(--glass-border);
+    font-family: inherit; font-size: 15px;
   }
 </style>
 </head>
@@ -201,6 +243,16 @@
 </div>
 
 <div class="quote" id="quote"></div>
+
+<div class="overlay" id="overlay">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-date" id="sheetDate"></div>
+    <div class="sheet-mood" id="sheetMood"></div>
+    <div id="sheetBody"></div>
+    <button class="sheet-close" id="sheetClose">닫기</button>
+  </div>
+</div>
 
 <script>
 const MOODS = [
@@ -322,12 +374,51 @@ function renderCal() {
       const n = rec.done.filter(h => data.habits.includes(h)).length;
       if (n) ratio = '<span class="ratio">' + (n >= data.habits.length && data.habits.length ? '★' : '●'.repeat(Math.min(n, 4))) + '</span>';
     }
-    html += '<div class="cal-cell' + (key === tk ? ' today' : '') + '" style="' + style + '">' + d + ratio + '</div>';
+    html += '<div class="cal-cell' + (key === tk ? ' today' : '') + '" data-key="' + key + '" style="' + style + '">' + d + ratio + '</div>';
   }
   $('calGrid').innerHTML = html;
   $('legend').innerHTML = MOODS.map(m => '<span><i style="background:' + m.color + '"></i>' + m.name + '</span>').join('') +
     '<span>● 습관 개수</span><span>★ 전부 달성</span>';
+  document.querySelectorAll('.cal-cell[data-key]').forEach(c => c.onclick = () => openDay(c.dataset.key));
 }
+
+// --- 날짜 상세 팝업 ---
+function openDay(key) {
+  const [y, m, d] = key.split('-').map(Number);
+  const dt = new Date(y, m - 1, d);
+  $('sheetDate').textContent = y + '년 ' + m + '월 ' + d + '일 ' + DOW[dt.getDay()] + '요일';
+  const rec = data.days[key];
+  const isToday = key === todayKey();
+
+  if (rec && rec.mood !== null && rec.mood !== undefined) {
+    const mo = MOODS[rec.mood];
+    $('sheetMood').innerHTML = '기분 · <span style="color:' + mo.color + '">' + mo.emoji + ' ' + mo.name + '</span>';
+  } else {
+    $('sheetMood').textContent = '기분 기록 없음';
+  }
+
+  const doneList = rec ? rec.done : [];
+  // 그날 했던 습관 + 현재 습관 목록을 합쳐서 보여줌 (과거에 지운 습관도 표시)
+  const allHabits = [...new Set([...data.habits, ...doneList])];
+  if (!allHabits.length || (!doneList.length && !(rec && rec.mood !== null && rec.mood !== undefined))) {
+    $('sheetBody').innerHTML = '<div class="sheet-empty">' +
+      (isToday ? '오늘은 아직 기록이 없어요.\n위에서 기분과 습관을 체크해 보세요 🌱'
+               : '이 날은 기록이 없어요.') + '</div>';
+  } else {
+    const doneCount = doneList.length;
+    let body = '<div class="sheet-section">습관 ' + doneCount + '개 완료</div>';
+    body += allHabits.map(h => {
+      const yes = doneList.includes(h);
+      return '<div class="sheet-habit ' + (yes ? 'yes' : 'no') + '">' +
+        '<div class="mk">' + (yes ? '✓' : '·') + '</div>' + h + '</div>';
+    }).join('');
+    $('sheetBody').innerHTML = body;
+  }
+  $('overlay').classList.add('open');
+}
+function closeDay() { $('overlay').classList.remove('open'); }
+$('sheetClose').onclick = closeDay;
+$('overlay').onclick = e => { if (e.target === $('overlay')) closeDay(); };
 $('prevM').onclick = () => { viewMonth--; if (viewMonth < 0) { viewMonth = 11; viewYear--; } renderCal(); };
 $('nextM').onclick = () => { viewMonth++; if (viewMonth > 11) { viewMonth = 0; viewYear++; } renderCal(); };
 

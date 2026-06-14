@@ -1,4 +1,4 @@
-const CACHE = 'haru-v1';
+const CACHE = 'haru-v2';
 const ASSETS = ['.', 'index.html', 'manifest.json', 'icon.svg'];
 
 self.addEventListener('install', e => {
