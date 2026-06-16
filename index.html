@@ -156,6 +156,24 @@
   .legend span { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--muted); }
   .legend i { width: 11px; height: 11px; border-radius: 50%; display: inline-block; }
 
+  /* --- 그래프 --- */
+  .chart { display: flex; align-items: flex-end; gap: 5px; height: 130px; padding-top: 6px; }
+  .chart .bar-col {
+    flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px;
+    height: 100%; justify-content: flex-end; cursor: default;
+  }
+  .chart .bar-wrap { width: 100%; flex: 1; display: flex; align-items: flex-end; }
+  .chart .bar {
+    width: 100%; border-radius: 5px 5px 0 0; min-height: 3px;
+    background: linear-gradient(180deg, var(--accent), var(--accent2));
+    transition: height 0.5s cubic-bezier(.4,0,.2,1); position: relative;
+  }
+  .chart .bar.full { background: linear-gradient(180deg, var(--gold), var(--accent)); box-shadow: 0 0 12px rgba(232,213,168,0.4); }
+  .chart .bar .val { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--muted); }
+  .chart .bar-day { font-size: 9px; color: var(--muted); }
+  .chart .bar-col.today .bar-day { color: var(--gold); font-weight: 700; }
+  .chart-foot { font-size: 12px; color: var(--muted); margin-top: 12px; text-align: center; }
+
   .quote {
     margin-top: 26px; color: var(--muted); font-size: 13px;
     font-family: 'Gowun Batang', serif; text-align: center;
@@ -240,6 +258,12 @@
   </div>
   <div class="cal-grid" id="calGrid"></div>
   <div class="legend" id="legend"></div>
+</div>
+
+<div class="card">
+  <div class="card-title">최근 2주 습관</div>
+  <div class="chart" id="chart"></div>
+  <div class="chart-foot" id="chartFoot"></div>
 </div>
 
 <div class="quote" id="quote"></div>
@@ -340,13 +364,13 @@ function renderHabits() {
     const rec = dayRec(todayKey());
     const idx = rec.done.indexOf(h);
     if (idx >= 0) rec.done.splice(idx, 1); else rec.done.push(h);
-    save(); renderHabits(); renderCal();
+    save(); renderHabits(); renderCal(); renderChart();
   });
   document.querySelectorAll('.del').forEach(b => b.onclick = () => {
     const h = data.habits[+b.dataset.del];
     if (!confirm('"' + h + '" 습관을 삭제할까요?\n(지난 기록은 그대로 남아요)')) return;
     data.habits.splice(+b.dataset.del, 1);
-    save(); renderHabits(); renderCal();
+    save(); renderHabits(); renderCal(); renderChart();
   });
 
   const doneCount = rec.done.filter(h => data.habits.includes(h)).length;
@@ -433,12 +457,40 @@ function addHabit() {
   data.habits.push(name);
   $('newHabit').value = '';
   $('addRow').classList.remove('open');
-  save(); renderHabits();
+  save(); renderHabits(); renderChart();
 }
 $('editBtn').onclick = () => {
   document.body.classList.toggle('editing');
   $('editBtn').textContent = document.body.classList.contains('editing') ? '완료' : '✎ 편집';
 };
+
+// --- 최근 2주 그래프 ---
+function renderChart() {
+  const tk = todayKey();
+  const total = data.habits.length;
+  const cols = [];
+  let sum = 0, recorded = 0;
+  for (let i = 13; i >= 0; i--) {
+    const dt = new Date();
+    dt.setDate(dt.getDate() - i);
+    const key = dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
+    const rec = data.days[key];
+    const n = rec ? rec.done.filter(h => data.habits.includes(h)).length : 0;
+    if (rec && (rec.done.length || rec.mood !== null && rec.mood !== undefined)) recorded++;
+    sum += n;
+    cols.push({ n, day: dt.getDate(), dow: DOW[dt.getDay()], key, full: total > 0 && n >= total });
+  }
+  const max = Math.max(total, 1, ...cols.map(c => c.n));
+  $('chart').innerHTML = cols.map(c => {
+    const h = Math.round(c.n / max * 100);
+    return '<div class="bar-col' + (c.key === tk ? ' today' : '') + '">' +
+      '<div class="bar-wrap"><div class="bar' + (c.full ? ' full' : '') + '" style="height:' + h + '%">' +
+      (c.n > 0 ? '<span class="val">' + c.n + '</span>' : '') + '</div></div>' +
+      '<div class="bar-day">' + c.day + '</div></div>';
+  }).join('');
+  const avg = recorded ? (sum / recorded).toFixed(1) : '0';
+  $('chartFoot').textContent = '하루 평균 ' + avg + '개 완료 · 14일 중 ' + recorded + '일 기록';
+}
 
 // --- 오늘의 한 줄 ---
 const quotes = [
@@ -453,6 +505,7 @@ $('quote').textContent = quotes[new Date().getDate() % quotes.length];
 renderMoods();
 renderHabits();
 renderCal();
+renderChart();
 
 if ('serviceWorker' in navigator && location.protocol !== 'file:') {
   navigator.serviceWorker.register('sw.js');
